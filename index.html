@@ -14,6 +14,7 @@
 <title>My Customers</title>
 <style>
 *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+[hidden]{display:none!important}
 :root{
   --bg:#f2f2f7;--card:#fff;--text:#1c1c1e;--muted:#86868c;--line:#e3e3e8;--fill:#ececf1;
   --danger:#d33a46;--ok:#23915c;--warn:#b5730a;--accent:#c93d6e;--accent-ink:#fff;
@@ -239,6 +240,41 @@ main{padding:0 16px 24px;max-width:672px;margin:0 auto}
 .dlg-b button+button{border-left:.5px solid var(--line)}
 .dlg-b button.strong{font-weight:600}
 .dlg-b button.danger{color:var(--danger);font-weight:600}
+.phgrid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;padding:12px}
+.ph{display:flex;flex-direction:column;gap:5px;min-width:0}
+.ph .im{position:relative;aspect-ratio:1;border-radius:10px;overflow:hidden;background:var(--fill);max-width:100%}
+.ph .im img{width:100%;height:100%;object-fit:cover;display:block}
+.ph .im .del{position:absolute;top:4px;right:4px;width:24px;height:24px;border-radius:50%;background:rgba(0,0,0,.55);color:#fff;display:grid;place-items:center;font-size:16px;line-height:1}
+.ph.untag .im{outline:2px solid var(--warn);outline-offset:-2px}
+.ph .tags{display:flex;flex-wrap:wrap;gap:4px}
+.ph .tags button,.ph .tags span{font-size:11.5px;font-weight:500;padding:3px 7px;border-radius:999px;background:var(--fill);color:var(--muted);max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.ph .tags .on{background:var(--accent);color:var(--accent-ink)}
+.ph .cap{font-size:12px;color:var(--muted);text-align:center;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.phadd{aspect-ratio:1;border-radius:10px;border:1.5px dashed color-mix(in srgb,var(--accent) 55%,transparent);color:var(--accent);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;font-size:12px;font-weight:600;text-align:center;padding:4px}
+.phadd svg{width:26px;height:26px}
+.phnote{font-size:13px;color:var(--warn);padding:0 12px 12px}
+.phcount{display:inline-flex;align-items:center;gap:3px;font-size:12px;color:var(--muted);font-weight:500;margin-left:6px;vertical-align:1px}
+.phcount svg{width:13px;height:13px}
+.fchips{display:flex;gap:6px;overflow-x:auto;scrollbar-width:none;padding:2px 0 4px;margin:0 -16px;padding-inline:16px}
+.fchips::-webkit-scrollbar{display:none}
+.fchips .chip{flex:none}
+.viewer{position:fixed;inset:0;z-index:160;background:#000;color:#fff;display:flex;flex-direction:column;opacity:0;transition:opacity .18s}
+.viewer.show{opacity:1}
+.viewer .vh{display:flex;align-items:center;gap:8px;padding:calc(env(safe-area-inset-top) + 8px) 12px 8px}
+.viewer .vh button{color:#fff;font-size:16px;padding:8px;min-width:44px}
+.viewer .vh .vt{flex:1;text-align:center;min-width:0}
+.viewer .vh .vt b{display:block;font-size:15px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.viewer .vh .vt span{font-size:12.5px;opacity:.7}
+.viewer .vb{flex:1;min-height:0;position:relative;display:flex;align-items:center;justify-content:center;touch-action:pan-y}
+.viewer .vb img{max-width:100%;max-height:100%;object-fit:contain;user-select:none;-webkit-user-select:none}
+.viewer .vn{position:absolute;top:50%;transform:translateY(-50%);width:44px;height:64px;color:#fff;opacity:.75;display:grid;place-items:center}
+.viewer .vn svg{width:24px;height:24px}
+.viewer .vn.l{left:0}.viewer .vn.r{right:0}
+.viewer .vf{display:flex;justify-content:center;gap:28px;padding:10px 12px calc(env(safe-area-inset-bottom) + 12px)}
+.viewer .vf button{color:#fff;display:flex;flex-direction:column;align-items:center;gap:3px;font-size:12px;opacity:.9}
+.viewer .vf svg{width:22px;height:22px}
+.busy{position:fixed;inset:0;z-index:210;background:rgba(0,0,0,.35);display:grid;place-items:center}
+.busy div{background:var(--card);color:var(--text);padding:16px 20px;border-radius:14px;font-weight:500;font-size:15px}
 #toast{position:fixed;left:50%;bottom:calc(150px + env(safe-area-inset-bottom));transform:translate(-50%,20px);background:var(--text);color:var(--bg);padding:10px 16px;border-radius:12px;font-size:15px;font-weight:500;opacity:0;transition:.25s;pointer-events:none;z-index:100;max-width:86%;text-align:center}
 #toast.show{opacity:1;transform:translate(-50%,0)}
 @media (min-width:700px){.sheet{border-radius:16px;bottom:24px;max-height:calc(100% - 48px)}}
@@ -248,7 +284,8 @@ main{padding:0 16px 24px;max-width:672px;margin:0 auto}
 <div id="app"></div>
 <div id="sheets"></div>
 <div id="toast"></div>
-<input type="file" id="importFile" accept=".json,application/json" hidden>
+<input type="file" id="importFile" accept=".zip,.json,application/zip,application/json" hidden>
+<input type="file" id="photoFile" accept="image/*" multiple hidden>
 <script>
 'use strict';
 /* =========================================================================
@@ -256,8 +293,8 @@ main{padding:0 16px 24px;max-width:672px;margin:0 auto}
    All data lives on this device (IndexedDB). Nothing is sent anywhere.
    ========================================================================= */
 
-const APP_VERSION = '1.1.0';
-const DB_NAME = 'my-customers', STORE = 'kv', KEY = 'state';
+const APP_VERSION = '1.2.0';
+const DB_NAME = 'my-customers', STORE = 'kv', KEY = 'state', PHOTO = 'photos';
 
 /* ---------- icons ---------- */
 const I = {
@@ -279,6 +316,7 @@ const I = {
   calAdd:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4.5" width="18" height="16.5" rx="3"/><path d="M3 9.5h18M8 2.5v4M16 2.5v4M12 12.5v6M9 15.5h6"/></svg>',
   repeat:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M17 2.5l3 3-3 3"/><path d="M4 11.5v-1a5 5 0 0 1 5-5h11M7 21.5l-3-3 3-3"/><path d="M20 12.5v1a5 5 0 0 1-5 5H4"/></svg>',
   copy:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"><rect x="8" y="8" width="13" height="13" rx="2.5"/><path d="M16 8V5.5A2.5 2.5 0 0 0 13.5 3h-8A2.5 2.5 0 0 0 3 5.5v8A2.5 2.5 0 0 0 5.5 16H8"/></svg>',
+  cam:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 8.5A2.5 2.5 0 0 1 5.5 6h2l1.5-2h6l1.5 2h2A2.5 2.5 0 0 1 21 8.5v9a2.5 2.5 0 0 1-2.5 2.5h-13A2.5 2.5 0 0 1 3 17.5z"/><circle cx="12" cy="13" r="3.8"/></svg>',
   share:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12M7.5 7.5L12 3l4.5 4.5"/><path d="M5 12v7a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-7"/></svg>',
 };
 
@@ -325,17 +363,22 @@ ru:{
   no_alarm:'Без напоминания', before_min:'За {n} мин', before_h:'За {n} ч', before_d:'За 1 день',
   data:'Данные', backup:'Сохранить резервную копию', restore:'Восстановить из копии', export_appts:'Экспорт записей (CSV)', export_fin:'Экспорт финансов (CSV)',
   wipe:'Удалить все данные', wipe_q:'Удалить ВСЕ данные без возможности восстановления? Сначала лучше сохранить резервную копию.', wipe_q2:'Точно удалить всё?',
-  restore_q:'Заменить текущие данные данными из файла «{f}»? ({c} клиентов, {a} записей)', restored:'Данные восстановлены', bad_file:'Это не файл резервной копии My Customers',
+  restore_q:'Заменить текущие данные данными из файла «{f}»? ({c} клиентов, {a} записей, {p} фото)', restored:'Данные восстановлены', bad_file:'Это не файл резервной копии My Customers',
   last_backup:'Последняя копия', backup_never:'ни разу',
-  backup_nag_t:'Пора сделать резервную копию', backup_nag:'Данные хранятся только в этом телефоне. Сохраните копию в папку «My Customers» в «Файлах».', backup_now:'Сохранить', later:'Позже',
+  backup_nag_t:'Пора сделать резервную копию', backup_nag:'Данные и фото хранятся только в этом телефоне. Сохраните копию в папку «My Customers» в «Файлах».', backup_now:'Сохранить', later:'Позже',
   install_t:'Установите на экран «Домой»', install:'Нажмите «Поделиться» в Safari → «На экран „Домой“». Так приложение будет работать без интернета, а данные не будут удаляться.',
   about:'О приложении', version:'Версия', storage:'Хранилище', persisted:'защищено от очистки', not_persisted:'обычное',
-  counts:'{c} клиентов · {a} записей',
+  counts:'{c} клиентов · {a} записей · {p} фото',
   services_empty:'Услуги сохраняются автоматически, когда вы пишете их в записи.', service_new:'Новая услуга', service:'Услуга',
   used:'использована', del_service_q:'Удалить услугу из списка? Старые записи не изменятся.',
   welcome_t:'Добро пожаловать!', welcome:'Здесь всё хранится только на вашем iPhone. Просто создайте запись: напишите, кто придёт и на что, — клиент и услуга сохранятся сами.',
   start:'Начать', untitled:'Без имени', remind_hint:'Телефон клиента не указан — выберите контакт в мессенджере.',
   tip_short:'чаевые', prepaid_short:'предопл.',
+  photos:'Фото', add_photo:'Добавить фото', photo_tag_hint:'Отметьте под каждым фото, к какой процедуре оно относится.', untagged_n:'Без процедуры: {n}',
+  del_photo_q:'Удалить это фото?', discard_q:'Закрыть без сохранения? Добавленные фото не сохранятся.', discard:'Не сохранять',
+  photo_err:'Не удалось добавить фото', adding_photos:'Добавляю фото…', all:'Все', progress:'Прогресс', no_photos_flt:'Фото с этой процедурой пока нет',
+  no_visits_flt:'Посещений с этой процедурой нет', share:'Поделиться', restoring:'Восстанавливаю… {x}', preparing:'Готовлю копию… {x}', photos_count:'Фото',
+  used_space:'Занято', no_services_photo:'Сначала укажите процедуру, тогда фото привяжется к ней.',
 },
 en:{
   tab_schedule:'Schedule', tab_clients:'Clients', tab_finance:'Finance', tab_stats:'Stats', tab_more:'More',
@@ -378,17 +421,22 @@ en:{
   no_alarm:'No alert', before_min:'{n} min before', before_h:'{n} h before', before_d:'1 day before',
   data:'Data', backup:'Save a backup', restore:'Restore from backup', export_appts:'Export appointments (CSV)', export_fin:'Export finances (CSV)',
   wipe:'Delete all data', wipe_q:'Delete ALL data permanently? Save a backup first.', wipe_q2:'Really delete everything?',
-  restore_q:'Replace current data with “{f}”? ({c} clients, {a} appointments)', restored:'Data restored', bad_file:'This is not a My Customers backup file',
+  restore_q:'Replace current data with “{f}”? ({c} clients, {a} appointments, {p} photos)', restored:'Data restored', bad_file:'This is not a My Customers backup file',
   last_backup:'Last backup', backup_never:'never',
   backup_nag_t:'Time to back up', backup_nag:'Your data lives only on this phone. Save a copy to the “My Customers” folder in Files.', backup_now:'Save', later:'Later',
   install_t:'Add to Home Screen', install:'In Safari tap Share → “Add to Home Screen”. The app then works offline and your data is kept.',
   about:'About', version:'Version', storage:'Storage', persisted:'protected from clean-up', not_persisted:'standard',
-  counts:'{c} clients · {a} appointments',
+  counts:'{c} clients · {a} appointments · {p} photos',
   services_empty:'Services are saved automatically when you type them in an appointment.', service_new:'New service', service:'Service',
   used:'used', del_service_q:'Remove this service from the list? Past appointments stay unchanged.',
   welcome_t:'Welcome!', welcome:'Everything is stored only on your iPhone. Just add an appointment: type who is coming and what for — the client and the service are saved automatically.',
   start:'Get started', untitled:'No name', remind_hint:'No phone number — pick the contact in the messenger.',
   tip_short:'tip', prepaid_short:'prepaid',
+  photos:'Photos', add_photo:'Add photo', photo_tag_hint:'Under each photo, mark which service it shows.', untagged_n:'Not linked: {n}',
+  del_photo_q:'Delete this photo?', discard_q:'Close without saving? Added photos will be lost.', discard:'Discard',
+  photo_err:'Could not add the photo', adding_photos:'Adding photos…', all:'All', progress:'Progress', no_photos_flt:'No photos for this service yet',
+  no_visits_flt:'No visits with this service', share:'Share', restoring:'Restoring… {x}', preparing:'Preparing backup… {x}', photos_count:'Photos',
+  used_space:'Used', no_services_photo:'Add a service first so the photo can be linked to it.',
 }};
 
 const DEFAULT_TPL = {
@@ -424,8 +472,10 @@ function normalize(s){
 let dbp = null;
 function idb(){
   if(!dbp) dbp = new Promise((res,rej)=>{
-    const r = indexedDB.open(DB_NAME,1);
-    r.onupgradeneeded = ()=>r.result.createObjectStore(STORE);
+    const r = indexedDB.open(DB_NAME,2);
+    r.onupgradeneeded = ()=>{ const db=r.result;
+      if(!db.objectStoreNames.contains(STORE)) db.createObjectStore(STORE);
+      if(!db.objectStoreNames.contains(PHOTO)) db.createObjectStore(PHOTO); };
     r.onsuccess = ()=>res(r.result);
     r.onerror = ()=>rej(r.error);
   });
@@ -508,6 +558,162 @@ function ask(msg,{ok='OK',danger=false,noCancel=false}={}){
     document.body.appendChild(w); requestAnimationFrame(()=>w.classList.add('show'));
     w.addEventListener('click',e=>{ const b=e.target.closest('[data-r]'); if(!b) return; e.stopPropagation(); w.remove(); res(b.dataset.r==='1'); });
   });
+}
+
+/* ---------- photos: blobs live in IndexedDB, appointments keep [{id, svc:[names]}] ---------- */
+function pTx(mode,fn){
+  return idb().then(db=>new Promise((res,rej)=>{
+    const tx=db.transaction(PHOTO,mode), st=tx.objectStore(PHOTO); let out; const r=fn(st);
+    if(r) r.onsuccess=()=>{out=r.result;};
+    tx.oncomplete=()=>res(out); tx.onerror=()=>rej(tx.error); tx.onabort=()=>rej(tx.error);
+  }));
+}
+const photoPut=(id,rec)=>pTx('readwrite',st=>st.put(rec,id));
+const photoGet=id=>pTx('readonly',st=>st.get(id));
+const photoKeys=()=>pTx('readonly',st=>st.getAllKeys());
+const photoDel=ids=>{ ids=(ids||[]).filter(Boolean); if(!ids.length) return Promise.resolve(); revokeUrls(ids); return pTx('readwrite',st=>{ ids.forEach(id=>st.delete(id)); }).catch(e=>console.warn(e)); };
+const photoClear=()=>{ revokeUrls([...urlCache.keys()].map(k=>k.split('|')[0])); return pTx('readwrite',st=>st.clear()); };
+const urlCache=new Map();
+async function photoUrl(id,kind){
+  const k=id+'|'+kind; if(urlCache.has(k)) return urlCache.get(k);
+  const r=await photoGet(id); if(!r) return '';
+  const u=URL.createObjectURL(r[kind]||r.full); urlCache.set(k,u); return u;
+}
+function revokeUrls(ids){ ids.forEach(id=>['thumb','full'].forEach(kd=>{ const u=urlCache.get(id+'|'+kd); if(u){ URL.revokeObjectURL(u); urlCache.delete(id+'|'+kd); } })); }
+function hydratePhotos(root){
+  (root||document).querySelectorAll('img[data-pid]:not([src])').forEach(img=>{
+    photoUrl(img.dataset.pid,img.dataset.kind||'thumb').then(u=>{ if(u) img.src=u; }).catch(()=>{});
+  });
+}
+function loadImg(blob){
+  return new Promise((res,rej)=>{ const u=URL.createObjectURL(blob), im=new Image();
+    im.onload=()=>{ res(im); setTimeout(()=>URL.revokeObjectURL(u),2000); };
+    im.onerror=()=>{ URL.revokeObjectURL(u); rej(new Error('image')); }; im.src=u; });
+}
+function scaleImg(im,max,q){
+  const w=im.naturalWidth, h=im.naturalHeight, k=Math.min(1,max/Math.max(w,h));
+  const c=document.createElement('canvas'); c.width=Math.max(1,Math.round(w*k)); c.height=Math.max(1,Math.round(h*k));
+  c.getContext('2d').drawImage(im,0,0,c.width,c.height);
+  return new Promise(r=>c.toBlob(b=>r(b),'image/jpeg',q));
+}
+async function makeThumb(blob){ return scaleImg(await loadImg(blob),420,.78); }
+async function storeImage(file){
+  const im=await loadImg(file);
+  const full=await scaleImg(im,1800,.85), thumb=await scaleImg(im,420,.78);
+  if(!full||!thumb) throw new Error('encode');
+  const id='p'+uid(); await photoPut(id,{full,thumb,ts:Date.now()}); return id;
+}
+// Which services a photo belongs to: with a single service it is automatic.
+function photoTags(a,p){
+  const sv=a.services||[];
+  if(sv.length===1) return [sv[0]];
+  const keep=new Set(sv.map(normName));
+  return (p.svc||[]).filter(x=>keep.has(normName(x)));
+}
+function allPhotoIds(appts){ const out=[]; (appts||state.appts).forEach(a=>(a.photos||[]).forEach(p=>out.push(p.id))); return out; }
+async function cleanupOrphans(){
+  try{ const used=new Set(allPhotoIds()); const keys=await photoKeys(); const orphan=(keys||[]).filter(k=>!used.has(k)); if(orphan.length) await photoDel(orphan); }catch(e){}
+}
+let photoPick=null;
+function pickPhotos(cb){ photoPick=cb; const inp=$('#photoFile'); inp.value=''; inp.click(); }
+$('#photoFile').addEventListener('change',async e=>{
+  const files=[...e.target.files]; const cb=photoPick; photoPick=null; if(!files.length||!cb) return;
+  busy(t('adding_photos'));
+  const ids=[];
+  for(const f of files){ try{ ids.push(await storeImage(f)); }catch(err){ console.warn(err); toast(t('photo_err')); } }
+  busy(false);
+  if(ids.length) cb(ids);
+});
+function busy(msg){
+  let el=document.getElementById('busy');
+  if(!msg){ if(el) el.remove(); return; }
+  if(!el){ el=document.createElement('div'); el.id='busy'; el.className='busy'; el.innerHTML='<div></div>'; document.body.appendChild(el); }
+  el.firstChild.textContent=msg;
+}
+
+/* full-screen viewer; items: [{id, title, sub}] */
+function openViewer(items,idx){
+  if(!items.length) return;
+  let i=Math.max(0,Math.min(idx||0,items.length-1));
+  const w=document.createElement('div'); w.className='viewer'; w.setAttribute('role','dialog'); w.setAttribute('aria-modal','true');
+  w.innerHTML=`<div class="vh"><button data-v="close">${esc(t('close'))}</button><div class="vt"><b></b><span></span></div><span style="min-width:44px;text-align:right;font-size:13px;opacity:.7" class="vc"></span></div>
+    <div class="vb"><img alt=""><button class="vn l" data-v="prev" aria-label="prev">${I.left}</button><button class="vn r" data-v="next" aria-label="next">${I.right}</button></div>
+    <div class="vf"><button data-v="share">${I.share}${esc(t('share'))}</button></div>`;
+  document.body.appendChild(w); requestAnimationFrame(()=>w.classList.add('show'));
+  const img=w.querySelector('img');
+  const show=()=>{
+    const it=items[i]; w.querySelector('.vt b').textContent=it.title||''; w.querySelector('.vt span').textContent=it.sub||'';
+    w.querySelector('.vc').textContent=items.length>1?(i+1)+'/'+items.length:'';
+    w.querySelector('.vn.l').hidden=i===0; w.querySelector('.vn.r').hidden=i===items.length-1;
+    img.removeAttribute('src');
+    photoUrl(it.id,'thumb').then(u=>{ if(items[i]===it&&!img.src) img.src=u; });
+    photoUrl(it.id,'full').then(u=>{ if(items[i]===it&&u) img.src=u; });
+  };
+  const go=d=>{ const n=i+d; if(n>=0&&n<items.length){ i=n; show(); } };
+  const close=()=>{ w.remove(); document.removeEventListener('keydown',key); };
+  const key=e=>{ if(e.key==='Escape') close(); else if(e.key==='ArrowLeft') go(-1); else if(e.key==='ArrowRight') go(1); };
+  document.addEventListener('keydown',key);
+  w.addEventListener('click',async e=>{
+    const b=e.target.closest('[data-v]'); if(!b) return; e.stopPropagation();
+    const v=b.dataset.v;
+    if(v==='close') close(); else if(v==='prev') go(-1); else if(v==='next') go(1);
+    else if(v==='share'){ const r=await photoGet(items[i].id); if(r) shareBlob('photo-'+(items[i].date||today())+'.jpg',r.full); }
+  });
+  let x0=null,y0=null;
+  const vb=w.querySelector('.vb');
+  vb.addEventListener('touchstart',e=>{x0=e.touches[0].clientX;y0=e.touches[0].clientY;},{passive:true});
+  vb.addEventListener('touchend',e=>{ if(x0==null) return; const dx=e.changedTouches[0].clientX-x0, dy=e.changedTouches[0].clientY-y0; x0=null;
+    if(Math.abs(dx)>50&&Math.abs(dx)>Math.abs(dy)) go(dx<0?1:-1); else if(dy>90&&Math.abs(dy)>Math.abs(dx)) close(); },{passive:true});
+  show();
+}
+
+/* ---------- ZIP (stored, no compression; reads deflate too when the browser can) ---------- */
+const CRC_T=(()=>{const tb=new Uint32Array(256);for(let n=0;n<256;n++){let c=n;for(let k=0;k<8;k++)c=c&1?0xEDB88320^(c>>>1):c>>>1;tb[n]=c>>>0;}return tb;})();
+function crc32(u8){ let c=0xFFFFFFFF; for(let i=0;i<u8.length;i++) c=CRC_T[(c^u8[i])&255]^(c>>>8); return (c^0xFFFFFFFF)>>>0; }
+async function makeZip(entries,onProgress){
+  const parts=[], central=[], enc=new TextEncoder(); let off=0;
+  const d=new Date(), dtime=(d.getHours()<<11)|(d.getMinutes()<<5)|(d.getSeconds()>>1), ddate=((d.getFullYear()-1980)<<9)|((d.getMonth()+1)<<5)|d.getDate();
+  for(let n=0;n<entries.length;n++){
+    const e=entries[n]; const name=enc.encode(e.name);
+    const bytes=e.data instanceof Blob?new Uint8Array(await e.data.arrayBuffer()):e.data;
+    const crc=crc32(bytes), size=bytes.length;
+    const lh=new DataView(new ArrayBuffer(30));
+    lh.setUint32(0,0x04034b50,true); lh.setUint16(4,20,true); lh.setUint16(6,0x0800,true); lh.setUint16(8,0,true);
+    lh.setUint16(10,dtime,true); lh.setUint16(12,ddate,true); lh.setUint32(14,crc,true); lh.setUint32(18,size,true); lh.setUint32(22,size,true);
+    lh.setUint16(26,name.length,true); lh.setUint16(28,0,true);
+    parts.push(lh.buffer,name,e.data instanceof Blob?e.data:bytes);
+    const ch=new DataView(new ArrayBuffer(46));
+    ch.setUint32(0,0x02014b50,true); ch.setUint16(4,20,true); ch.setUint16(6,20,true); ch.setUint16(8,0x0800,true); ch.setUint16(10,0,true);
+    ch.setUint16(12,dtime,true); ch.setUint16(14,ddate,true); ch.setUint32(16,crc,true); ch.setUint32(20,size,true); ch.setUint32(24,size,true);
+    ch.setUint16(28,name.length,true); ch.setUint32(42,off,true);
+    central.push(ch.buffer,name);
+    off+=30+name.length+size;
+    if(onProgress) onProgress(n+1,entries.length);
+  }
+  const cdSize=central.reduce((s,x)=>s+(x.byteLength??x.length),0);
+  const end=new DataView(new ArrayBuffer(22));
+  end.setUint32(0,0x06054b50,true); end.setUint16(8,entries.length,true); end.setUint16(10,entries.length,true);
+  end.setUint32(12,cdSize,true); end.setUint32(16,off,true);
+  return new Blob([...parts,...central,end.buffer],{type:'application/zip'});
+}
+async function readZip(file){
+  const tl=Math.min(file.size,65557), tail=new DataView(await file.slice(file.size-tl).arrayBuffer());
+  let p=-1; for(let i=tl-22;i>=0;i--) if(tail.getUint32(i,true)===0x06054b50){p=i;break;}
+  if(p<0) throw new Error('zip');
+  const count=tail.getUint16(p+10,true), cdSize=tail.getUint32(p+12,true), cdOff=tail.getUint32(p+16,true);
+  const cd=new DataView(await file.slice(cdOff,cdOff+cdSize).arrayBuffer()), dec=new TextDecoder(), out=new Map();
+  let q=0;
+  for(let n=0;n<count;n++){
+    if(cd.getUint32(q,true)!==0x02014b50) throw new Error('zip');
+    const method=cd.getUint16(q+10,true), csize=cd.getUint32(q+20,true), nl=cd.getUint16(q+28,true), el=cd.getUint16(q+30,true), cl=cd.getUint16(q+32,true), lo=cd.getUint32(q+42,true);
+    const name=dec.decode(new Uint8Array(cd.buffer,cd.byteOffset+q+46,nl));
+    const lh=new DataView(await file.slice(lo,lo+30).arrayBuffer()); const start=lo+30+lh.getUint16(26,true)+lh.getUint16(28,true);
+    const raw=file.slice(start,start+csize);
+    if(method===0) out.set(name,raw);
+    else if(method===8&&typeof DecompressionStream!=='undefined') out.set(name,await new Response(raw.stream().pipeThrough(new DecompressionStream('deflate-raw'))).blob());
+    q+=46+nl+el+cl;
+  }
+  return out;
 }
 
 /* ---------- domain ---------- */
@@ -593,20 +799,57 @@ function exportFinCsv(){
   ops.sort((a,b)=>a[0].localeCompare(b[0])); rows.push(...ops);
   shareFile('finances-'+today()+'.csv','text/csv',csv(rows));
 }
+async function shareBlob(name,blob){
+  try{
+    const file=new File([blob],name,{type:blob.type||'application/octet-stream'});
+    if(navigator.canShare&&navigator.canShare({files:[file]})){ await navigator.share({files:[file]}); return true; }
+  }catch(e){ if(e&&e.name==='AbortError') return false; console.warn(e); }
+  const url=URL.createObjectURL(blob); const a=document.createElement('a'); a.href=url; a.download=name; document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(()=>URL.revokeObjectURL(url),60000); return true;
+}
 async function backup(){
-  const data=JSON.parse(JSON.stringify(state)); data.app='my-customers'; data.exported=new Date().toISOString();
-  const ok=await shareFile('my-customers-backup-'+today()+'.json','application/json',JSON.stringify(data,null,1));
-  if(ok){ state.settings.lastBackup=new Date().toISOString(); save(); render(); }
+  try{
+    const data=JSON.parse(JSON.stringify(state)); data.app='my-customers'; data.exported=new Date().toISOString(); data.appVersion=APP_VERSION;
+    const entries=[{name:'data.json',data:new TextEncoder().encode(JSON.stringify(data))}];
+    const ids=[...new Set(allPhotoIds())];
+    for(let n=0;n<ids.length;n++){
+      busy(t('preparing',{x:(n+1)+'/'+ids.length}));
+      const r=await photoGet(ids[n]); if(!r) continue;
+      entries.push({name:'photos/'+ids[n]+'.jpg',data:r.full});
+      if(r.thumb) entries.push({name:'photos/'+ids[n]+'_t.jpg',data:r.thumb});
+    }
+    const zip=await makeZip(entries,(a,b)=>busy(t('preparing',{x:Math.round(a/b*100)+'%'})));
+    busy(false);
+    const ok=await shareBlob('my-customers-backup-'+today()+'.zip',zip);
+    if(ok){ state.settings.lastBackup=new Date().toISOString(); save(); render(); }
+  }catch(e){ busy(false); console.warn(e); ask('⚠️ '+(e&&e.message||e),{ok:'OK',noCancel:true}); }
 }
 function restore(){ const inp=$('#importFile'); inp.value=''; inp.click(); }
 $('#importFile').addEventListener('change',async e=>{
   const f=e.target.files[0]; if(!f) return;
+  let obj=null, files=null;
   try{
-    const obj=JSON.parse(await f.text());
+    const head=new Uint8Array(await f.slice(0,4).arrayBuffer());
+    if(head[0]===0x50&&head[1]===0x4b){ files=await readZip(f); const dj=files.get('data.json'); if(!dj) throw 0; obj=JSON.parse(await dj.text()); }
+    else obj=JSON.parse(await f.text());
     if(!obj||!Array.isArray(obj.clients)||!Array.isArray(obj.appts)) throw 0;
-    if(!await ask(t('restore_q',{f:f.name,c:obj.clients.length,a:obj.appts.length}),{ok:t('restore')})) return;
-    state=normalize(obj); await writeState(); render(); toast(t('restored'));
-  }catch(err){ ask(t('bad_file'),{ok:'OK',noCancel:true}); }
+  }catch(err){ ask(t('bad_file'),{ok:'OK',noCancel:true}); return; }
+  const ids=[...new Set(allPhotoIds(obj.appts))];
+  const have=files?ids.filter(id=>files.has('photos/'+id+'.jpg')):[];
+  if(!await ask(t('restore_q',{f:f.name,c:obj.clients.length,a:obj.appts.length,p:have.length}),{ok:t('restore')})) return;
+  try{
+    await photoClear();
+    for(let n=0;n<have.length;n++){
+      busy(t('restoring',{x:(n+1)+'/'+have.length}));
+      const id=have[n], full=files.get('photos/'+id+'.jpg');
+      let thumb=files.get('photos/'+id+'_t.jpg');
+      if(!thumb){ try{ thumb=await makeThumb(full); }catch(e){ thumb=full; } }
+      await photoPut(id,{full:new Blob([full],{type:'image/jpeg'}),thumb:new Blob([thumb],{type:'image/jpeg'}),ts:Date.now()});
+    }
+    // drop links to photos that were not in the file
+    const hs=new Set(have); obj.appts.forEach(a=>{ if(Array.isArray(a.photos)) a.photos=a.photos.filter(p=>hs.has(p.id)); });
+    state=normalize(obj); await writeState(); busy(false); render(); toast(t('restored'));
+  }catch(err){ busy(false); console.warn(err); ask('⚠️ '+(err&&err.message||err),{ok:'OK',noCancel:true}); }
 });
 
 /* ---------- iPhone Calendar (.ics) ---------- */
@@ -680,6 +923,7 @@ function render(){
     `<header class="top">${v.head}</header><main>${v.body}</main>${v.fab||''}`+
     `<nav class="tabbar">${tabs.map(([k,ic])=>`<button class="${ui.tab===k?'on':''}" data-act="tab" data-k="${k}">${ic}<span>${t('tab_'+k)}</span></button>`).join('')}</nav>`;
   if(v.after) v.after();
+  hydratePhotos($('#app'));
 }
 
 /* ----- Schedule ----- */
@@ -710,7 +954,7 @@ function apptRow(a,{past=false,showDate=false}={}){
   return `<button class="row appt ${past?'past':''} ${cx?'cx':''}" data-act="editAppt" data-id="${a.id}">
     <div class="bar"></div>
     <div class="tm">${showDate?`<b>${esc(fmtDay(a.date))}</b><span>${a.time}</span>`:`<b>${a.time}</b><span>${fromMin(apptEnd(a))}</span>`}</div>
-    <div class="grow"><div class="t1">${esc(clientName(a))}${st}</div><div class="t2">${esc(sub)||'&nbsp;'}</div></div>
+    <div class="grow"><div class="t1">${esc(clientName(a))}${st}${(a.photos||[]).length?`<span class="phcount">${I.cam}${a.photos.length}</span>`:''}</div><div class="t2">${esc(sub)||'&nbsp;'}</div></div>
     <div class="end"><div class="price">${a.price||a.tip?money((+a.price||0)+(+a.tip||0)):''}</div>
       ${!cx&&a.prepaid>0&&due>0&&a.date>=today()?`<div class="t2 small">${t('left_to_pay')} ${money(due)}</div>`:a.tip>0&&!cx?`<div class="t2 small">${t('tip_short')} ${money(a.tip)}</div>`:''}</div>
   </button>`;
@@ -999,7 +1243,8 @@ function moreView(){
   <div class="card small">
     <div class="kv"><span>${t('version')}</span><span>${APP_VERSION}</span></div>
     <div class="kv"><span>${t('storage')}</span><span>${persisted||isStandalone()?t('persisted'):t('not_persisted')}</span></div>
-    <div class="kv"><span>My Customers</span><span>${esc(t('counts',{c:state.clients.length,a:state.appts.length}))}</span></div>
+    <div class="kv"><span>My Customers</span><span>${esc(t('counts',{c:state.clients.length,a:state.appts.length,p:allPhotoIds().length}))}</span></div>
+    <div class="kv"><span>${t('used_space')}</span><span id="usedSpace">…</span></div>
   </div>`;
   return {head, body, after:()=>{
     const bind=(id,fn,ev='change')=>{const el=document.getElementById(id); if(el) el.addEventListener(ev,()=>{fn(el.value);save();});};
@@ -1009,6 +1254,7 @@ function moreView(){
     bind('setTpl',v=>{s.tpl=(v.trim()===DEFAULT_TPL[s.lang]?'':v.trim());});
     bind('setAlarm',v=>{s.calAlarm=+v;});
     bind('setCalMode',v=>{s.calMode=v;});
+    try{ navigator.storage.estimate().then(e=>{ const el=document.getElementById('usedSpace'); if(el&&e&&e.usage!=null) el.textContent=(e.usage/1048576).toFixed(1)+' MB'; }); }catch(e){ const el=document.getElementById('usedSpace'); if(el) el.textContent='—'; }
   }};
 }
 
@@ -1018,6 +1264,11 @@ function moreView(){
 const sheetStack=[];
 function openSheet(def){ sheetStack.push(def); drawSheets(true); }
 function closeSheet(){ const d=sheetStack.pop(); if(d&&d.onClose) d.onClose(); drawSheets(false); render(); }
+async function tryCloseSheet(){
+  const top=sheetStack[sheetStack.length-1];
+  if(top&&top.confirmClose&&top.confirmClose()&&!await ask(t('discard_q'),{ok:t('discard'),danger:true})) return;
+  closeSheet();
+}
 function closeAllSheets(){ while(sheetStack.length) sheetStack.pop(); drawSheets(false); render(); }
 function drawSheets(anim){
   const root=$('#sheets');
@@ -1030,6 +1281,7 @@ function drawSheets(anim){
       <div class="sb" id="sb">${top.body()}</div></div>`;
   if(anim) requestAnimationFrame(()=>requestAnimationFrame(()=>{root.querySelector('.backdrop')?.classList.add('show');root.querySelector('.sheet')?.classList.add('show');}));
   if(top.mount) top.mount($('#sb'));
+  hydratePhotos($('#sb'));
 }
 function redrawSheet(){ drawSheets(false); }
 
@@ -1066,6 +1318,30 @@ function apptSheet(existing, pre={}){
   }
   function chips(){ return f.services.map((n,i)=>`<button class="chip sel" data-rmsvc="${i}"><span>${esc(n)}</span><span class="x">×</span></button>`).join(''); }
   const isNewClient=()=>!!cleanName(fs.name)&&!findClientByName(fs.name);
+  if(!Array.isArray(f.photos)) f.photos=[];
+  const addedNow=[];   // blobs added in this sheet (deleted again if a new appointment is discarded)
+  function photosHtml(){
+    const sv=f.services; const multi=sv.length>1;
+    const untag=multi?f.photos.filter(p=>!photoTags(f,p).length).length:0;
+    const tiles=f.photos.map((p,i)=>{
+      const tags=photoTags(f,p); const tset=new Set(tags.map(normName));
+      const chipsH=!sv.length?'':!multi?`<div class="tags"><span class="on">${esc(sv[0])}</span></div>`
+        :`<div class="tags">${sv.map(n=>`<button type="button" class="${tset.has(normName(n))?'on':''}" data-phtag="${i}" data-svc="${esc(n)}">${esc(n)}</button>`).join('')}</div>`;
+      return `<div class="ph ${multi&&!tags.length?'untag':''}"><div class="im"><img data-pid="${p.id}" alt="" data-phopen="${i}"><button type="button" class="del" data-phdel="${i}" aria-label="${esc(t('del'))}">×</button></div>${chipsH}</div>`;
+    }).join('');
+    return `<div class="phgrid">${tiles}<button type="button" class="phadd" data-phadd="1">${I.cam}${t('add_photo')}</button></div>
+      ${multi&&f.photos.length?`<div class="phnote">${untag?esc(t('untagged_n',{n:untag}))+' · ':''}${esc(t('photo_tag_hint'))}</div>`:''}
+      ${!sv.length&&f.photos.length?`<div class="phnote">${esc(t('no_services_photo'))}</div>`:''}`;
+  }
+  function syncPhotoTags(){
+    const keep=new Set(f.services.map(normName));
+    f.photos.forEach(p=>{ p.svc=f.services.length===1?[f.services[0]]:(p.svc||[]).filter(x=>keep.has(normName(x))); });
+  }
+  function commitPhotos(){ // existing appointment: photos are saved at once, like in the Photos app
+    if(isNew) return; const a=state.appts.find(x=>x.id===f.id); if(!a) return;
+    a.photos=f.photos.map(p=>({id:p.id,svc:[...(p.svc||[])]})); save();
+  }
+  function refreshPhotos(){ const box=document.getElementById('phBox'); if(box){ box.innerHTML=photosHtml(); hydratePhotos(box); } }
 
   openSheet({
     title:isNew?t('appt_new'):t('appt_edit'), right:t('save'),
@@ -1092,6 +1368,8 @@ function apptSheet(existing, pre={}){
         <div class="field"><label>${t('tip')}</label><input id="fTip" inputmode="decimal" value="${f.tip||''}" placeholder="$0"></div>
       </div>
       <div class="form"><div class="field col"><label>${t('note')}</label><textarea id="fNote" rows="2" placeholder="${t('note_ph')}">${esc(f.note)}</textarea></div></div>
+      <div class="sec-title">${t('photos')}</div>
+      <div class="form" id="phBox">${photosHtml()}</div>
       ${!isNew?`<div class="form"><div class="status">${['ok','cancelled','noshow'].map(k=>`<button class="chip ${f.status===k?'sel':''}" data-status="${k}">${t('st_'+k)}</button>`).join('')}</div></div>`:''}
       <div class="form"><div class="field"><label style="width:auto;flex:1">${t('to_calendar_on_save')}</label><span class="toggle"><input type="checkbox" id="fCal" ${fs.cal?'checked':''}><i></i></span></div></div>
       ${!isNew?`<div class="btnrow">
@@ -1110,7 +1388,7 @@ function apptSheet(existing, pre={}){
       g('fPhone').addEventListener('input',e=>{fs.phone=e.target.value;fs.phoneTouched=true;});
       el.querySelector('#cSugs').addEventListener('click',e=>{const b=e.target.closest('[data-pickclient]'); if(!b) return; const c=clientById(b.dataset.pickclient); fs.name=c.name; fs.phone=c.phone||''; nm.value=c.name; g('cSugs').innerHTML=''; g('phoneRow').style.display=c.phone?'none':''; g('fPhone').value=fs.phone; g('fSvc').focus(); });
       const sv=g('fSvc');
-      const refreshSvc=()=>{ g('sChips').innerHTML=chips(); g('sChips').style.marginBottom=f.services.length?'8px':''; g('sSugs').innerHTML=svcSugs(); g('fPrice').value=f.price||''; g('fDur').innerHTML=durOpts(); };
+      const refreshSvc=()=>{ g('sChips').innerHTML=chips(); g('sChips').style.marginBottom=f.services.length?'8px':''; g('sSugs').innerHTML=svcSugs(); g('fPrice').value=f.price||''; g('fDur').innerHTML=durOpts(); refreshPhotos(); };
       const addSvc=name=>{ name=cleanName(name); if(!name) return; const ex=findService(name); name=ex?ex.name:name; if(!f.services.some(x=>normName(x)===normName(name))) f.services.push(name); fs.svcText=''; sv.value=''; autoPrice(); refreshSvc(); };
       fs.addPending=()=>{ if(cleanName(sv.value)) addSvc(sv.value); };
       sv.addEventListener('input',()=>{ fs.svcText=sv.value; if(/[,;]$/.test(sv.value)){ addSvc(sv.value.slice(0,-1)); return; } g('sSugs').innerHTML=svcSugs(); });
@@ -1125,6 +1403,22 @@ function apptSheet(existing, pre={}){
       g('fPre').addEventListener('input',e=>{ f.prepaid=num(e.target.value); });
       g('fTip').addEventListener('input',e=>{ f.tip=num(e.target.value); });
       g('fNote').addEventListener('input',e=>{ f.note=e.target.value; });
+      g('phBox').addEventListener('click',async e=>{
+        const b=e.target.closest('[data-phadd],[data-phdel],[data-phtag],[data-phopen]'); if(!b) return; e.preventDefault();
+        if(b.dataset.phadd){ fs.addPending&&fs.addPending();
+          pickPhotos(ids=>{ ids.forEach(id=>{ addedNow.push(id); f.photos.push({id,svc:f.services.length===1?[f.services[0]]:[]}); }); commitPhotos(); refreshPhotos(); });
+        } else if(b.dataset.phdel!=null){
+          if(!await ask(t('del_photo_q'),{ok:t('del'),danger:true})) return;
+          const [p]=f.photos.splice(+b.dataset.phdel,1); commitPhotos(); photoDel([p.id]); refreshPhotos();
+        } else if(b.dataset.phtag!=null){
+          const p=f.photos[+b.dataset.phtag], n=b.dataset.svc; p.svc=p.svc||[];
+          const i=p.svc.findIndex(x=>normName(x)===normName(n)); if(i>=0) p.svc.splice(i,1); else p.svc.push(n);
+          commitPhotos(); refreshPhotos();
+        } else if(b.dataset.phopen!=null){
+          const nm=cleanName(fs.name)||t('untitled');
+          openViewer(f.photos.map(p=>({id:p.id,date:f.date,title:nm,sub:fmtDayY(f.date)+(photoTags(f,p).length?' · '+photoTags(f,p).join(', '):'')})),+b.dataset.phopen);
+        }
+      });
       g('fCal').addEventListener('change',e=>{ fs.cal=e.target.checked; state.settings.calOnSave=fs.cal; save(); });
       el.querySelectorAll('[data-status]').forEach(b=>b.addEventListener('click',()=>{ f.status=b.dataset.status; el.querySelectorAll('[data-status]').forEach(x=>x.classList.toggle('sel',x===b)); }));
     },
@@ -1145,14 +1439,17 @@ function apptSheet(existing, pre={}){
         if(!s){ s={id:uid(),name:cleanName(n),price:single?(+f.price||0):0,dur:single?(+f.dur||0):0,count:0}; state.services.push(s); }
         if(isNew||!(existing.services||[]).some(x=>normName(x)===normName(n))) s.count=(s.count||0)+1;
       });
+      syncPhotoTags(); fs.saved=true;
       if(isNew){ f.id=uid(); f.created=new Date().toISOString(); state.appts.push(f); }
       else { const i=state.appts.findIndex(a=>a.id===f.id); state.appts[i]=f; }
       save(); ui.sel=f.date; if(ui.monthOpen) ui.monthAnchor=f.date;
       if(fs.cal&&isActive(f)) sendToCalendar([f],'appointment-'+f.date);
       closeSheet(); toast(t('saved'));
     },
+    confirmClose:()=>isNew&&!fs.saved&&f.photos.length>0,
+    onClose:()=>{ if(isNew&&!fs.saved&&addedNow.length) photoDel(addedNow); },
     acts:{
-      apDelete:async()=>{ if(!await ask(t('del_appt_q'),{ok:t('del'),danger:true})) return; state.appts=state.appts.filter(a=>a.id!==f.id); save(); closeSheet(); toast(t('deleted')); },
+      apDelete:async()=>{ if(!await ask(t('del_appt_q'),{ok:t('del'),danger:true})) return; const a=state.appts.find(x=>x.id===f.id); photoDel(allPhotoIds(a?[a]:[])); state.appts=state.appts.filter(a=>a.id!==f.id); save(); closeSheet(); toast(t('deleted')); },
       apCal:()=>sendToCalendar([f],'appointment-'+f.date),
       apRemind:()=>remindSheet(f),
       apRebook:()=>{ closeSheet(); apptSheet(null,{clientId:f.clientId,services:f.services,date:addDays(f.date,21)}); },
@@ -1182,12 +1479,28 @@ function remindSheet(a){
 /* ----- client card ----- */
 function clientSheet(id){
   const c=clientById(id); if(!c) return;
+  let flt=null; // selected service name, or null for all visits
+  const hasSvc=(a,n)=>(a.services||[]).some(x=>normName(x)===normName(n));
+  function galleryItems(list){ // oldest first, so it reads as progress
+    const items=[];
+    [...list].sort((x,y)=>(x.date+x.time).localeCompare(y.date+y.time)).forEach(a=>(a.photos||[]).forEach(p=>{
+      const tags=photoTags(a,p);
+      if(flt&&!tags.some(x=>normName(x)===normName(flt))) return;
+      items.push({id:p.id,date:a.date,title:fmtDayY(a.date),sub:tags.join(', ')});
+    }));
+    return items;
+  }
   openSheet({title:c.name, left:t('close'),
     body:()=>{
       const cc=clientById(id); if(!cc) return '';
       const s=clientStats(id); const td=today();
-      const up=s.list.filter(a=>a.date>=td).sort((x,y)=>(x.date+x.time).localeCompare(y.date+y.time));
-      const hist=s.list.filter(a=>a.date<td);
+      const svcCount={}; s.list.forEach(a=>(a.services||[]).forEach(n=>{ const k=normName(n); svcCount[k]=svcCount[k]||{n:cleanName(n),c:0}; svcCount[k].c++; }));
+      const svcs=Object.values(svcCount).sort((a,b)=>b.c-a.c);
+      if(flt&&!svcCount[normName(flt)]) flt=null;
+      const shown=flt?s.list.filter(a=>hasSvc(a,flt)):s.list;
+      const gal=galleryItems(shown);
+      const up=shown.filter(a=>a.date>=td).sort((x,y)=>(x.date+x.time).localeCompare(y.date+y.time));
+      const hist=shown.filter(a=>a.date<td);
       const years={}; hist.forEach(a=>{(years[a.date.slice(0,4)]=years[a.date.slice(0,4)]||[]).push(a);});
       return `<div style="display:flex;flex-direction:column;align-items:center;padding:14px 0 4px">
           <div class="avatar" style="width:68px;height:68px;font-size:24px">${esc(initials(cc.name))}</div></div>
@@ -1210,6 +1523,13 @@ function clientSheet(id){
           <div class="tile"><div class="l">${t('last_visit')}</div><div class="v" style="font-size:17px;padding-top:3px">${s.last?esc(fmtDayY(s.last)):t('never')}</div></div>
         </div>
         <button class="btn primary" data-act="cNew">${I.plus}${t('new_appt_for')}</button>
+        ${svcs.length>1||(svcs.length===1&&gal.length)?`<div class="sec-title">${t('services')}</div><div class="fchips" id="cFlt">
+          <button class="chip ${!flt?'sel':''}" data-flt="">${t('all')}</button>
+          ${svcs.map(x=>`<button class="chip ${flt&&normName(flt)===normName(x.n)?'sel':''}" data-flt="${esc(x.n)}"><span>${esc(x.n)}</span><small>${x.c}</small></button>`).join('')}</div>`:''}
+        ${gal.length?`<div class="sec-title">${flt?esc(t('progress'))+' · '+esc(flt):esc(t('photos'))} <span class="muted" style="text-transform:none;letter-spacing:0">${gal.length}</span></div>
+          <div class="form"><div class="phgrid">${gal.map((g2,i)=>`<button type="button" class="ph" data-gal="${i}"><span class="im"><img data-pid="${g2.id}" alt=""></span><span class="cap">${esc(fmtDayY(g2.date))}</span></button>`).join('')}</div></div>`
+          :(flt?`<div class="hint" style="margin:8px 4px">${t('no_photos_flt')}</div>`:'')}
+        ${flt&&!shown.length?`<div class="empty">${t('no_visits_flt')}</div>`:''}
         ${up.length?`<div class="sec-title">${t('upcoming')}</div><div class="list">${up.map(a=>apptRow(a,{showDate:true})).join('')}</div>`:''}
         ${Object.keys(years).sort().reverse().map(y=>`<div class="sec-title">${t('history')} · ${y}</div><div class="list">${years[y].map(a=>apptRow(a,{showDate:true,past:true})).join('')}</div>`).join('')}
         <button class="btn danger" data-act="cDelete" style="margin-top:22px">${t('del')}</button>`;
@@ -1232,6 +1552,12 @@ function clientSheet(id){
       g('cPhone').addEventListener('change',e=>{ cc.phone=cleanName(e.target.value); save(); redrawSheet(); });
       g('cInsta').addEventListener('change',e=>{ cc.insta=cleanName(e.target.value); save(); redrawSheet(); });
       g('cNote').addEventListener('change',e=>{ cc.note=e.target.value; save(); });
+      el.addEventListener('click',e=>{
+        const fb=e.target.closest('[data-flt]');
+        if(fb){ e.preventDefault(); flt=fb.dataset.flt||null; const sc=el.scrollTop; redrawSheet(); const nb=document.getElementById('sb'); if(nb) nb.scrollTop=sc; return; }
+        const gb=e.target.closest('[data-gal]');
+        if(gb){ e.preventDefault(); const s2=clientStats(id); openViewer(galleryItems(flt?s2.list.filter(a=>hasSvc(a,flt)):s2.list),+gb.dataset.gal); }
+      });
     },
     acts:{
       cCall:()=>{ const cc=clientById(id); if(cc.phone) openUrl('tel:'+phoneDigits(cc.phone)); },
@@ -1242,6 +1568,7 @@ function clientSheet(id){
       cDelete:async()=>{
         const n=state.appts.filter(a=>a.clientId===id).length;
         if(!await ask(n?t('del_client_appts_q',{n}):t('del_client_q'),{ok:t('del'),danger:true})) return;
+        photoDel(allPhotoIds(state.appts.filter(a=>a.clientId===id)));
         state.appts=state.appts.filter(a=>a.clientId!==id); state.clients=state.clients.filter(x=>x.id!==id); save(); closeSheet(); toast(t('deleted'));
       },
     }});
@@ -1376,11 +1703,11 @@ const ACT={
   backup:()=>backup(), restore:()=>restore(), csvAppts:()=>exportApptsCsv(), csvFin:()=>exportFinCsv(),
   calTest:()=>{ const d=today(); const fake={id:'test-'+uid(),date:d,time:fromMin(Math.min(23*60,Math.ceil((nowMin()+60)/15)*15)),dur:30,clientId:null,services:['My Customers test'],price:0}; sendToCalendar([fake],'test'); },
   calUpcoming:()=>{ const td=today(); sendToCalendar(state.appts.filter(a=>a.date>=td&&isActive(a)),'upcoming-appointments'); },
-  wipe:async()=>{ if(!await ask(t('wipe_q'),{ok:t('del'),danger:true})||!await ask(t('wipe_q2'),{ok:t('del'),danger:true})) return; const keep=state.settings; state=defaults(); state.settings=Object.assign(state.settings,{lang:keep.lang,theme:keep.theme,accent:keep.accent,welcomed:true}); writeState(); render(); toast(t('deleted')); },
+  wipe:async()=>{ if(!await ask(t('wipe_q'),{ok:t('del'),danger:true})||!await ask(t('wipe_q2'),{ok:t('del'),danger:true})) return; photoClear().catch(()=>{}); const keep=state.settings; state=defaults(); state.settings=Object.assign(state.settings,{lang:keep.lang,theme:keep.theme,accent:keep.accent,welcomed:true}); writeState(); render(); toast(t('deleted')); },
   hideNag:()=>{ ui.nagHidden=true; render(); },
   hideInstall:()=>{ ui.installHidden=true; render(); },
-  sheetBack:()=>closeSheet(),
-  sheetCancel:()=>closeSheet(),
+  sheetBack:()=>tryCloseSheet(),
+  sheetCancel:()=>tryCloseSheet(),
   sheetOk:()=>{ const top=sheetStack[sheetStack.length-1]; if(top&&top.ok) top.ok(); },
 };
 document.addEventListener('click',e=>{
@@ -1396,6 +1723,7 @@ document.addEventListener('click',e=>{
    ========================================================================= */
 (async function start(){
   state=normalize(await loadState());
+  setTimeout(cleanupOrphans,3000);
   const td=today(); ui.sel=td; ui.monthAnchor=td; ui.finAnchor=td; ui.statAnchor=td;
   render();
   if(!state.settings.welcomed&&!state.appts.length) welcomeSheet();
