@@ -1,6 +1,6 @@
 // My Customers — service worker: makes the app work offline.
 // When you change index.html, bump the version below so phones pick up the update.
-const CACHE = 'my-customers-v1';
+const CACHE = 'my-customers-v2';
 const ASSETS = ['./', './index.html', './manifest.webmanifest', './icon-180.png', './icon-192.png', './icon-512.png'];
 
 self.addEventListener('install', e => {

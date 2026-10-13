@@ -58,11 +58,13 @@ main{padding:0 16px 24px;max-width:672px;margin:0 auto}
 .empty b{display:block;color:var(--text);font-size:17px;margin-bottom:4px}
 
 /* week strip */
-.week{display:flex;align-items:center;gap:2px;margin:4px -8px 0;touch-action:pan-y}
+.week{display:flex;align-items:center;gap:2px;margin:4px -8px 0}
 .week .nav{width:26px;height:44px;color:var(--muted);display:grid;place-items:center;flex:none}
 .week .nav svg{width:16px;height:16px}
-.days{flex:1;display:grid;grid-template-columns:repeat(7,1fr);gap:2px}
-.day{display:flex;flex-direction:column;align-items:center;padding:6px 0 7px;border-radius:12px;gap:3px;min-width:0}
+.days{flex:1;min-width:0;display:flex;overflow-x:auto;overflow-y:hidden;scroll-snap-type:x mandatory;scrollbar-width:none;overscroll-behavior-x:contain;-webkit-overflow-scrolling:touch}
+.days::-webkit-scrollbar{display:none}
+.day{flex:0 0 calc(100% / 7);scroll-snap-align:start;display:flex;flex-direction:column;align-items:center;padding:6px 0 7px;border-radius:12px;gap:3px;min-width:0}
+.day.mstart .dw{color:var(--accent)}
 .day .dw{font-size:11px;color:var(--muted);text-transform:uppercase;font-weight:600}
 .day .dn{font-size:18px;font-weight:600;width:34px;height:34px;border-radius:50%;display:grid;place-items:center}
 .day .dots{height:6px;display:flex;gap:2px}
@@ -228,6 +230,15 @@ main{padding:0 16px 24px;max-width:672px;margin:0 auto}
 .sw.on{outline-color:var(--text);border-color:var(--card)}
 .warnbox{background:color-mix(in srgb,var(--warn) 14%,transparent);color:var(--text);border-radius:12px;padding:10px 14px;font-size:14px;margin:10px 0}
 
+.dlg-wrap{position:fixed;inset:0;z-index:200;background:rgba(0,0,0,.4);display:grid;place-items:center;padding:24px;opacity:0;transition:opacity .15s}
+.dlg-wrap.show{opacity:1}
+.dlg{background:var(--card);border-radius:16px;width:100%;max-width:300px;overflow:hidden;text-align:center}
+.dlg p{margin:0;padding:20px 18px 16px;font-size:15px;line-height:1.4}
+.dlg-b{display:flex;border-top:.5px solid var(--line)}
+.dlg-b button{flex:1;padding:13px 8px;color:var(--accent);font-size:17px}
+.dlg-b button+button{border-left:.5px solid var(--line)}
+.dlg-b button.strong{font-weight:600}
+.dlg-b button.danger{color:var(--danger);font-weight:600}
 #toast{position:fixed;left:50%;bottom:calc(150px + env(safe-area-inset-bottom));transform:translate(-50%,20px);background:var(--text);color:var(--bg);padding:10px 16px;border-radius:12px;font-size:15px;font-weight:500;opacity:0;transition:.25s;pointer-events:none;z-index:100;max-width:86%;text-align:center}
 #toast.show{opacity:1;transform:translate(-50%,0)}
 @media (min-width:700px){.sheet{border-radius:16px;bottom:24px;max-height:calc(100% - 48px)}}
@@ -245,7 +256,7 @@ main{padding:0 16px 24px;max-width:672px;margin:0 auto}
    All data lives on this device (IndexedDB). Nothing is sent anywhere.
    ========================================================================= */
 
-const APP_VERSION = '1.0.0';
+const APP_VERSION = '1.1.0';
 const DB_NAME = 'my-customers', STORE = 'kv', KEY = 'state';
 
 /* ---------- icons ---------- */
@@ -381,7 +392,7 @@ en:{
 }};
 
 const DEFAULT_TPL = {
-  ru:'Здравствуйте, {name}! Напоминаю о записи {date} в {time}{services}. До встречи!',
+  ru:'Здравствуйте, {name}! Напоминаю, что вы записаны на {date} в {time}{services}. До встречи!',
   en:'Hi {name}! Just a reminder of your appointment on {date} at {time}{services}. See you!'
 };
 const ACCENTS = {rose:'#c93d6e', plum:'#8b48b5', blue:'#1f74e0', teal:'#0f8a7e', amber:'#c56a12', graphite:'#55565c'};
@@ -490,6 +501,15 @@ function durLabel(m){ m=+m||0; const h=Math.floor(m/60), mm=m%60; return (h?h+' 
 function initials(n){ const p=cleanName(n).split(' ').filter(Boolean); return ((p[0]||'?')[0]+(p[1]?p[1][0]:'')).toUpperCase(); }
 function toast(msg){ const el=$('#toast'); el.textContent=msg; el.classList.add('show'); clearTimeout(toast.t); toast.t=setTimeout(()=>el.classList.remove('show'),1900); }
 
+function ask(msg,{ok='OK',danger=false,noCancel=false}={}){
+  return new Promise(res=>{
+    const w=document.createElement('div'); w.className='dlg-wrap';
+    w.innerHTML=`<div class="dlg" role="alertdialog" aria-modal="true"><p>${esc(msg)}</p><div class="dlg-b">${noCancel?'':`<button data-r="0">${esc(t('cancel'))}</button>`}<button data-r="1" class="${danger?'danger':'strong'}">${esc(ok)}</button></div></div>`;
+    document.body.appendChild(w); requestAnimationFrame(()=>w.classList.add('show'));
+    w.addEventListener('click',e=>{ const b=e.target.closest('[data-r]'); if(!b) return; e.stopPropagation(); w.remove(); res(b.dataset.r==='1'); });
+  });
+}
+
 /* ---------- domain ---------- */
 const clientById = id=>state.clients.find(c=>c.id===id);
 const isActive = a=>a.status!=='cancelled'&&a.status!=='noshow';
@@ -534,7 +554,7 @@ function sumRange(from,to,{onlyPast=true}={}){
     if(onlyPast && a.date>td){ planned+=(+a.price||0)+(+a.tip||0); continue; }
     services+=+a.price||0; tips+=+a.tip||0; count++; minutes+=+a.dur||0; clients.add(a.clientId);
   }
-  for(const e of state.expenses) if(e.date>=from&&e.date<=to&&(!onlyPast||e.date<=td||true)) exp+=+e.amount||0;
+  for(const e of state.expenses) if(e.date>=from&&e.date<=to) exp+=+e.amount||0;
   for(const i of state.incomes) if(i.date>=from&&i.date<=to) other+=+i.amount||0;
   const income=services+tips+other;
   return {services,tips,other,income,exp,profit:income-exp,planned,count,cx,minutes,clients};
@@ -584,9 +604,9 @@ $('#importFile').addEventListener('change',async e=>{
   try{
     const obj=JSON.parse(await f.text());
     if(!obj||!Array.isArray(obj.clients)||!Array.isArray(obj.appts)) throw 0;
-    if(!confirm(t('restore_q',{f:f.name,c:obj.clients.length,a:obj.appts.length}))) return;
+    if(!await ask(t('restore_q',{f:f.name,c:obj.clients.length,a:obj.appts.length}),{ok:t('restore')})) return;
     state=normalize(obj); await writeState(); render(); toast(t('restored'));
-  }catch(err){ alert(t('bad_file')); }
+  }catch(err){ ask(t('bad_file'),{ok:'OK',noCancel:true}); }
 });
 
 /* ---------- iPhone Calendar (.ics) ---------- */
@@ -630,14 +650,14 @@ function reminderText(a){
   const c=clientById(a.clientId)||{};
   const tpl=state.settings.tpl||DEFAULT_TPL[state.settings.lang]||DEFAULT_TPL.ru;
   const sv=(a.services||[]).length?' ('+a.services.join(', ')+')':'';
-  const firstName=cleanName(c.name||'');
+  const firstName=cleanName(c.name||'').split(' ')[0];
   return tpl.split('{name}').join(firstName).split('{date}').join(fmt(a.date,{weekday:'long',day:'numeric',month:'long'})).split('{time}').join(a.time).split('{services}').join(sv);
 }
 function smsLink(phone,body){ return 'sms:'+phoneDigits(phone)+'&body='+encodeURIComponent(body||''); }
 function waLink(phone,body){ const d=phoneDigits(phone).replace('+',''); return 'https://wa.me/'+(d||'')+'?text='+encodeURIComponent(body||''); }
 function instaLink(h){ h=String(h||'').trim(); if(!h) return ''; if(/^https?:\/\//i.test(h)) return h; h=h.replace(/^@/,'').replace(/^(www\.)?instagram\.com\//i,''); return 'https://instagram.com/'+encodeURIComponent(h); }
 function openUrl(u){ const a=document.createElement('a'); a.href=u; if(/^https?:/.test(u)){a.target='_blank';a.rel='noopener';} document.body.appendChild(a); a.click(); a.remove(); }
-async function copyText(s){ try{ await navigator.clipboard.writeText(s); toast(t('copied')); }catch(e){ prompt('',s); } }
+async function copyText(s){ try{ await navigator.clipboard.writeText(s); toast(t('copied')); }catch(e){ const ta=document.querySelector('#rText'); if(ta){ ta.focus(); ta.select(); } toast('⌘C / Copy'); } }
 
 /* =========================================================================
    RENDER
@@ -665,7 +685,7 @@ function render(){
 /* ----- Schedule ----- */
 function scheduleView(){
   const sel=ui.sel, td=today();
-  const head=`<h1><button data-act="toggleMonth" class="${ui.monthOpen?'open':''}">${esc(fmtMonthYear(ui.monthOpen?ui.monthAnchor:sel))}${I.down}</button></h1>
+  const head=`<h1><button data-act="toggleMonth" class="${ui.monthOpen?'open':''}"><span id="mTitle">${esc(fmtMonthYear(ui.monthOpen?ui.monthAnchor:(ui.visibleDate||sel)))}</span>${I.down}</button></h1>
     ${sel!==td?`<button class="hbtn" data-act="goToday">${t('today')}</button>`:''}`;
   let body='';
   body+=nagBanners();
@@ -680,7 +700,7 @@ function scheduleView(){
   } else {
     body+=`<div class="list">${list.map(a=>apptRow(a,{past:(a.date<td)||(a.date===td&&apptEnd(a)<=nowMin())})).join('')}</div>`;
   }
-  return {head, body, fab:`<button class="fab" data-act="newAppt" aria-label="${t('appt_new')}">${I.plus}</button>`, after:bindSwipe};
+  return {head, body, fab:`<button class="fab" data-act="newAppt" aria-label="${t('appt_new')}">${I.plus}</button>`, after:()=>{ if(!ui.monthOpen) bindStrip(); }};
 }
 const nowMin = ()=>{const n=new Date();return n.getHours()*60+n.getMinutes();};
 function apptRow(a,{past=false,showDate=false}={}){
@@ -695,16 +715,68 @@ function apptRow(a,{past=false,showDate=false}={}){
       ${!cx&&a.prepaid>0&&due>0&&a.date>=today()?`<div class="t2 small">${t('left_to_pay')} ${money(due)}</div>`:a.tip>0&&!cx?`<div class="t2 small">${t('tip_short')} ${money(a.tip)}</div>`:''}</div>
   </button>`;
 }
-function weekStrip(){
-  const ws=weekStart(ui.sel), td=today();
-  let cells='';
-  for(let i=0;i<7;i++){
-    const d=addDays(ws,i); const n=apptsOn(d).filter(isActive).length;
-    cells+=`<button class="day ${d===ui.sel?'sel':''} ${d===td?'today':''} ${isOff(d)?'off':''}" data-act="pick" data-d="${d}">
-      <span class="dw">${esc(fmt(d,{weekday:'short'}).replace('.',''))}</span><span class="dn">${pdate(d).getDate()}</span>
-      <span class="dots">${'<i></i>'.repeat(Math.min(n,3))}</span></button>`;
+/* Day strip: one continuous, smoothly scrollable row of days (about ±1 year around the anchor). */
+const STRIP_SPAN=371;
+const dayDiff=(a,b)=>Math.round((pdate(a)-pdate(b))/864e5);
+function stripRange(){
+  const n=2*STRIP_SPAN+7;
+  const fromOf=anchor=>weekStart(addDays(anchor,-STRIP_SPAN));
+  // Re-centre only when the selected day changed and is outside the rendered range.
+  if(!ui.stripAnchor || (ui.stripSelSeen!==ui.sel && (dayDiff(ui.sel,fromOf(ui.stripAnchor))<7 || dayDiff(ui.sel,fromOf(ui.stripAnchor))>n-8))){
+    ui.stripAnchor=ui.sel; ui.stripPos=null;
   }
-  return `<div class="week" id="week"><button class="nav" data-act="shiftWeek" data-n="-7" aria-label="prev">${I.left}</button><div class="days">${cells}</div><button class="nav" data-act="shiftWeek" data-n="7" aria-label="next">${I.right}</button></div>`;
+  ui.stripSelSeen=ui.sel;
+  return {from:fromOf(ui.stripAnchor), n};
+}
+function weekStrip(){
+  const {from,n}=stripRange(), td=today();
+  const cnt={}; for(const a of state.appts) if(isActive(a)) cnt[a.date]=(cnt[a.date]||0)+1;
+  const off=new Set(state.daysOff);
+  const wd=[]; { const d=pdate(from); for(let i=0;i<7;i++){ wd[d.getDay()]=esc(fmt(dstr(d),{weekday:'short'}).replace('.','')); d.setDate(d.getDate()+1); } }
+  let cells=''; const dt=pdate(from);
+  for(let i=0;i<n;i++){
+    const d=dstr(dt), k=cnt[d]||0, day=dt.getDate();
+    cells+=`<button class="day${d===ui.sel?' sel':''}${d===td?' today':''}${off.has(d)?' off':''}${day===1?' mstart':''}" data-act="pick" data-d="${d}"><span class="dw">${wd[dt.getDay()]}</span><span class="dn">${day}</span><span class="dots">${'<i></i>'.repeat(Math.min(k,3))}</span></button>`;
+    dt.setDate(dt.getDate()+1);
+  }
+  return `<div class="week"><button class="nav" data-act="stripNav" data-n="-7" aria-label="prev">${I.left}</button><div class="days" id="strip">${cells}</div><button class="nav" data-act="stripNav" data-n="7" aria-label="next">${I.right}</button></div>`;
+}
+function bindStrip(){
+  const el=document.getElementById('strip'); if(!el) return;
+  const {from,n}=stripRange();
+  const cw=()=>el.clientWidth/7||1;
+  const smooth=ui.stripSmooth; ui.stripSmooth=false;
+  const selIdx=dayDiff(ui.sel,from);
+  let pos=ui.stripPos;
+  if(pos==null) pos=dayDiff(weekStart(ui.sel),from);
+  el.scrollLeft=Math.round(pos)*cw();
+  // If the selected day is not on screen, bring its week into view.
+  if(selIdx<Math.round(pos)||selIdx>Math.round(pos)+6){
+    const target=dayDiff(weekStart(ui.sel),from)*cw();
+    if(smooth&&!matchMedia('(prefers-reduced-motion: reduce)').matches) el.scrollTo({left:target,behavior:'smooth'}); else el.scrollLeft=target;
+  }
+  const title=document.getElementById('mTitle');
+  let raf=0, idle=0;
+  const update=()=>{
+    raf=0; ui.stripPos=el.scrollLeft/cw();
+    ui.visibleDate=addDays(from,Math.min(n-1,Math.max(0,Math.round(ui.stripPos)+3)));
+    if(title) title.textContent=fmtMonthYear(ui.visibleDate);
+  };
+  update();
+  el.addEventListener('scroll',()=>{
+    if(!raf) raf=requestAnimationFrame(update);
+    clearTimeout(idle);
+    idle=setTimeout(()=>{ // near the edge of the rendered range: re-centre quietly, keeping the same days on screen
+      const p=Math.round(el.scrollLeft/cw());
+      if(p<28||p>n-35){
+        const first=addDays(from,p);
+        ui.stripAnchor=addDays(first,3); ui.stripSelSeen=ui.sel;
+        const nf=weekStart(addDays(ui.stripAnchor,-STRIP_SPAN));
+        ui.stripPos=dayDiff(first,nf);
+        render();
+      }
+    },250);
+  },{passive:true});
 }
 function monthGrid(){
   const ma=ui.monthAnchor, ms=monthStart(ma), me=monthEnd(ma), gs=weekStart(ms), td=today();
@@ -730,14 +802,6 @@ function nagBanners(){
     h+=`<div class="banner"><div class="grow"><b>${t('backup_nag_t')}</b>${t('backup_nag')}<div class="acts"><button data-act="backup">${t('backup_now')}</button><button data-act="hideNag" style="color:var(--muted)">${t('later')}</button></div></div></div>`;
   return h;
 }
-function bindSwipe(){
-  const el=document.getElementById('week'); if(!el) return;
-  let x0=null,y0=null;
-  el.addEventListener('touchstart',e=>{x0=e.touches[0].clientX;y0=e.touches[0].clientY;},{passive:true});
-  el.addEventListener('touchend',e=>{ if(x0==null) return; const dx=e.changedTouches[0].clientX-x0, dy=e.changedTouches[0].clientY-y0; x0=null;
-    if(Math.abs(dx)>50&&Math.abs(dy)<40){ ui.sel=addDays(ui.sel,dx<0?7:-7); render(); } },{passive:true});
-}
-
 /* ----- Clients ----- */
 function clientsView(){
   const head=`<h1>${t('tab_clients')}</h1><button class="hbtn round" data-act="newClient" aria-label="${t('client_new')}">${I.plus}</button>`;
@@ -1064,14 +1128,14 @@ function apptSheet(existing, pre={}){
       g('fCal').addEventListener('change',e=>{ fs.cal=e.target.checked; state.settings.calOnSave=fs.cal; save(); });
       el.querySelectorAll('[data-status]').forEach(b=>b.addEventListener('click',()=>{ f.status=b.dataset.status; el.querySelectorAll('[data-status]').forEach(x=>x.classList.toggle('sel',x===b)); }));
     },
-    ok:()=>{
+    ok:async()=>{
       fs.addPending&&fs.addPending();
       if(!cleanName(fs.name)){ toast(t('need_client')); $('#fName')?.focus(); return; }
       // overlap check
       const others=apptsOn(f.date).filter(a=>a.id!==f.id&&isActive(a));
       const st=toMin(f.time), en=st+(+f.dur||0);
       const clash=f.status==='ok'?others.find(a=>toMin(a.time)<en&&apptEnd(a)>st):null;
-      if(clash&&!confirm(t('overlap_q',{name:clientName(clash),time:clash.time}))) return;
+      if(clash&&!await ask(t('overlap_q',{name:clientName(clash),time:clash.time}),{ok:t('save')})) return;
       const c=getOrCreateClient(fs.name);
       if(cleanName(fs.phone)&&fs.phone!==c.phone) c.phone=cleanName(fs.phone);
       f.clientId=c.id;
@@ -1088,7 +1152,7 @@ function apptSheet(existing, pre={}){
       closeSheet(); toast(t('saved'));
     },
     acts:{
-      apDelete:()=>{ if(!confirm(t('del_appt_q'))) return; state.appts=state.appts.filter(a=>a.id!==f.id); save(); closeSheet(); toast(t('deleted')); },
+      apDelete:async()=>{ if(!await ask(t('del_appt_q'),{ok:t('del'),danger:true})) return; state.appts=state.appts.filter(a=>a.id!==f.id); save(); closeSheet(); toast(t('deleted')); },
       apCal:()=>sendToCalendar([f],'appointment-'+f.date),
       apRemind:()=>remindSheet(f),
       apRebook:()=>{ closeSheet(); apptSheet(null,{clientId:f.clientId,services:f.services,date:addDays(f.date,21)}); },
@@ -1153,11 +1217,11 @@ function clientSheet(id){
     mount:el=>{
       const cc=clientById(id); if(!cc) return;
       const g=x=>el.querySelector('#'+x);
-      g('cName').addEventListener('change',e=>{
+      g('cName').addEventListener('change',async e=>{
         const v=cleanName(e.target.value); if(!v){ e.target.value=cc.name; return; }
         const other=state.clients.find(x=>x.id!==id&&normName(x.name)===normName(v));
         if(other){
-          if(confirm(t('merge_q',{name:other.name}))){
+          if(await ask(t('merge_q',{name:other.name}),{ok:'OK'})){
             state.appts.forEach(a=>{ if(a.clientId===id) a.clientId=other.id; });
             other.phone=other.phone||cc.phone; other.insta=other.insta||cc.insta; other.note=[other.note,cc.note].filter(Boolean).join('\n');
             state.clients=state.clients.filter(x=>x.id!==id); save(); sheetStack.pop(); toast(t('merged')); clientSheet(other.id); return;
@@ -1175,9 +1239,9 @@ function clientSheet(id){
       cWa:()=>{ const cc=clientById(id); if(cc.phone) openUrl(waLink(cc.phone,'')); },
       cInsta:()=>{ const cc=clientById(id); if(cc.insta) openUrl(instaLink(cc.insta)); },
       cNew:()=>{ const last=clientAppts(id)[0]; apptSheet(null,{clientId:id,services:last?last.services:[],date:ui.sel>=today()?ui.sel:today()}); },
-      cDelete:()=>{
+      cDelete:async()=>{
         const n=state.appts.filter(a=>a.clientId===id).length;
-        if(!confirm(n?t('del_client_appts_q',{n}):t('del_client_q'))) return;
+        if(!await ask(n?t('del_client_appts_q',{n}):t('del_client_q'),{ok:t('del'),danger:true})) return;
         state.appts=state.appts.filter(a=>a.clientId!==id); state.clients=state.clients.filter(x=>x.id!==id); save(); closeSheet(); toast(t('deleted'));
       },
     }});
@@ -1228,7 +1292,7 @@ function moneySheet(kind,existing){
       if(existing){ const i=state[coll].findIndex(x=>x.id===f.id); state[coll][i]=f; } else { f.id=uid(); state[coll].push(f); }
       save(); closeSheet(); toast(t('saved'));
     },
-    acts:{ mDel:()=>{ if(!confirm(t('del_q'))) return; state[coll]=state[coll].filter(x=>x.id!==f.id); save(); closeSheet(); toast(t('deleted')); } }
+    acts:{ mDel:async()=>{ if(!await ask(t('del_q'),{ok:t('del'),danger:true})) return; state[coll]=state[coll].filter(x=>x.id!==f.id); save(); closeSheet(); toast(t('deleted')); } }
   });
 }
 
@@ -1262,8 +1326,15 @@ function serviceSheet(existing){
       if(existing){ const i=state.services.findIndex(s=>s.id===f.id); state.services[i]=f; } else { f.id=uid(); state.services.push(f); }
       save(); closeSheet();
     },
-    acts:{ vDel:()=>{ if(!confirm(t('del_service_q'))) return; state.services=state.services.filter(s=>s.id!==f.id); save(); closeSheet(); } }
+    acts:{ vDel:async()=>{ if(!await ask(t('del_service_q'),{ok:t('del'),danger:true})) return; state.services=state.services.filter(s=>s.id!==f.id); save(); closeSheet(); } }
   });
+}
+function goalSheet(){
+  let v=state.settings.goal||0;
+  openSheet({title:t('goal'), right:t('save'),
+    body:()=>`<div class="form"><div class="field"><label>${t('amount')}</label><input id="gAmt" inputmode="decimal" value="${v||''}" placeholder="$0"></div></div>`,
+    mount:el=>{ const i=el.querySelector('#gAmt'); i.addEventListener('input',e=>v=num(e.target.value)); setTimeout(()=>i.focus(),350); },
+    ok:()=>{ state.settings.goal=v; save(); closeSheet(); }});
 }
 function welcomeSheet(){
   openSheet({title:t('welcome_t'), left:' ', right:t('start'),
@@ -1283,10 +1354,10 @@ const ACT={
   tab:el=>{ ui.tab=el.dataset.k; window.scrollTo(0,0); render(); },
   pick:el=>{ ui.sel=el.dataset.d; render(); },
   pickMonth:el=>{ ui.sel=el.dataset.d; ui.monthAnchor=el.dataset.d; ui.monthOpen=false; render(); },
-  shiftWeek:el=>{ ui.sel=addDays(ui.sel,+el.dataset.n); render(); },
+  stripNav:el=>{ const st=document.getElementById('strip'); if(st) st.scrollBy({left:(+el.dataset.n)*st.clientWidth/7,behavior:'smooth'}); },
   shiftMonth:el=>{ ui.monthAnchor=addMonths(monthStart(ui.monthAnchor),+el.dataset.n); render(); },
-  toggleMonth:()=>{ ui.monthOpen=!ui.monthOpen; ui.monthAnchor=ui.sel; render(); },
-  goToday:()=>{ ui.sel=today(); ui.monthAnchor=ui.sel; render(); },
+  toggleMonth:()=>{ ui.monthOpen=!ui.monthOpen; ui.monthAnchor=ui.monthOpen?(ui.visibleDate||ui.sel):ui.sel; render(); },
+  goToday:()=>{ ui.sel=today(); ui.monthAnchor=ui.sel; ui.stripSmooth=true; render(); },
   toggleOff:()=>{ const d=ui.sel; state.daysOff=isOff(d)?state.daysOff.filter(x=>x!==d):[...state.daysOff,d]; save(); render(); },
   newAppt:()=>apptSheet(null,{date:ui.sel}),
   editAppt:el=>{ const a=state.appts.find(x=>x.id===el.dataset.id); if(a) apptSheet(a); },
@@ -1299,13 +1370,13 @@ const ACT={
   editIncome:el=>moneySheet('inc',state.incomes.find(x=>x.id===el.dataset.id)),
   statShift:el=>{ ui.statAnchor=addMonths(ui.statAnchor,+el.dataset.n); render(); },
   statMode:el=>{ ui.statSoFar=el.dataset.v==='1'; render(); },
-  setGoal:()=>{ const v=prompt(t('goal')+' ($)', state.settings.goal||''); if(v==null) return; state.settings.goal=num(v); save(); render(); },
+  setGoal:()=>goalSheet(),
   set:el=>{ const k=el.dataset.k; state.settings[k]=el.dataset.v; save(); render(); if(sheetStack.length) redrawSheet(); },
   services:()=>servicesSheet(),
   backup:()=>backup(), restore:()=>restore(), csvAppts:()=>exportApptsCsv(), csvFin:()=>exportFinCsv(),
   calTest:()=>{ const d=today(); const fake={id:'test-'+uid(),date:d,time:fromMin(Math.min(23*60,Math.ceil((nowMin()+60)/15)*15)),dur:30,clientId:null,services:['My Customers test'],price:0}; sendToCalendar([fake],'test'); },
   calUpcoming:()=>{ const td=today(); sendToCalendar(state.appts.filter(a=>a.date>=td&&isActive(a)),'upcoming-appointments'); },
-  wipe:()=>{ if(!confirm(t('wipe_q'))||!confirm(t('wipe_q2'))) return; const keep=state.settings; state=defaults(); state.settings=Object.assign(state.settings,{lang:keep.lang,theme:keep.theme,accent:keep.accent,welcomed:true}); writeState(); render(); toast(t('deleted')); },
+  wipe:async()=>{ if(!await ask(t('wipe_q'),{ok:t('del'),danger:true})||!await ask(t('wipe_q2'),{ok:t('del'),danger:true})) return; const keep=state.settings; state=defaults(); state.settings=Object.assign(state.settings,{lang:keep.lang,theme:keep.theme,accent:keep.accent,welcomed:true}); writeState(); render(); toast(t('deleted')); },
   hideNag:()=>{ ui.nagHidden=true; render(); },
   hideInstall:()=>{ ui.installHidden=true; render(); },
   sheetBack:()=>closeSheet(),
